@@ -3,6 +3,10 @@ const api = {
     parameters: [],
     result: 'i32'
   },
+  fork: {
+    parameters: [],
+    result: 'i32'
+  },
 }
 
 const name = 'demo'

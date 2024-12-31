@@ -6,6 +6,7 @@
   "disableExperimentalSEAWarning": true,
   "assets": {
     "./build/Release/demo.node": "./build/Release/demo.node",
-    "./build/Release/linecount.node": "./build/Release/linecount.node"
+    "./build/Release/linecount.node": "./build/Release/linecount.node",
+    "./build/Release/count.node": "./build/Release/count.node"
   }
 }
