@@ -40,6 +40,14 @@ using v8::BackingStore;
 using v8::Number;
 using v8::NewStringType;
 
+void NODE_SET_VALUE(Isolate *isolate, Local<Object> 
+  recv, const char *name, Local<Value> value) {
+  Local<Context> context = isolate->GetCurrentContext();
+  recv->Set(context, String::NewFromUtf8(isolate, name, 
+    NewStringType::kInternalized).ToLocalChecked(), 
+    value);
+}
+
 void NODE_SET_FAST_METHOD(Isolate* isolate, Local<Object> 
   exports, const char * name, CFunction* fastCFunc, FunctionCallback slowFunc) {
   Local<Context> context = isolate->GetCurrentContext();

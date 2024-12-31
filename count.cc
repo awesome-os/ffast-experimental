@@ -110,6 +110,7 @@ void Initialize(Local<Object> exports) {
   Isolate* isolate = Isolate::GetCurrent();
   NODE_SET_FAST_METHOD(isolate, exports, "memcount_sse", &pFmemcount_sse, memcount_sseSlow);
 NODE_SET_FAST_METHOD(isolate, exports, "memcount_avx2", &pFmemcount_avx2, memcount_avx2Slow);
+  
 }
 
 NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)

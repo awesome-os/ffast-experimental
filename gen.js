@@ -111,7 +111,7 @@ void ${n}Slow(const FunctionCallbackInfo<Value> &args) {\n`
   if (needsUnwrap(result)) {
     if (result === 'pointer') {
       src += `  Local<ArrayBuffer> ab = args[${parameters.length - override.filter(v => v).length}].As<Uint32Array>()->Buffer();\n`
-      src += `  ((${rpointer || getType(result)}*)ab->Data())[0] = rc;\n`
+      src += `  ((${rpointer || get_type(result)}*)ab->Data())[0] = rc;\n`
     } else if (result === 'i64') {
       src += `  args.GetReturnValue().Set(Number::New(isolate, static_cast<int64_t>(rc)));\n`
     } else if (result === 'u64') {
@@ -220,9 +220,35 @@ function gen_initializers (config) {
   for (const name of Object.keys(config.api || {})) {
     const def = config.api[name]
     const n = def.name || name
-    src.push(`NODE_SET_FAST_METHOD(isolate, exports, "${n}", &pF${n}, ${n}Slow);`)
+    if (def.nofast) {
+      src.push(`NODE_SET_METHOD(exports, "${n}", ${n}Slow);`)
+    } else {
+      src.push(`NODE_SET_FAST_METHOD(isolate, exports, "${n}", &pF${n}, ${n}Slow);`)
+    }
   }
   return src.join('\n')
+}
+
+function initConstant(n, constants) {
+  if (!constants) return ''
+  if (!constants.hasOwnProperty(n)) return ''
+  const type = constants[n]
+  if (type === 'u32') {
+    return `  NODE_SET_VALUE(isolate, exports, "${n}", Integer::New(isolate, (uint32_t)${n}));\n`
+  }
+  if (type ==='i32') {
+    return `  NODE_SET_VALUE(isolate, exports, "${n}", Integer::New(isolate, (int32_t)${n}));\n`
+  }
+  if (type ==='u64') {
+    return `  NODE_SET_VALUE(isolate, exports, "${n}", BigInt::New(isolate, (uint64_t)${n}));\n`
+  }
+  if (type ==='i64') {
+    return `  NODE_SET_VALUE(isolate, exports, "${n}", BigInt::New(isolate, (int64_t)${n}));\n`
+  }
+  if (isNumeric(type)) {
+    return `  NODE_SET_VALUE(isolate, exports, "${n}", Number::New(isolate, (int64_t)${type}));\n`
+  }
+  throw new Error('TODO')
 }
 
 function get_source (config) {
@@ -237,6 +263,7 @@ ${gen_handlers(config)
 void Initialize(Local<Object> exports) {
   Isolate* isolate = Isolate::GetCurrent();
   ${gen_initializers(config)}
+  ${Object.keys(config.constants || {}).map(n => initConstant(n, config.constants)).join('')}
 }
 
 NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)

@@ -1,6 +1,7 @@
-// hello.cc
+
 #include "ffast.h"
 #include <sys/mman.h>
+#include <dlfcn.h>
 
 namespace ffast {
 
@@ -15,89 +16,6 @@ enum FastTypes: int {
   f64 = 9, u64 = 10, i64 = 11, iSize = 12, uSize = 13, pointer = 14,
   buffer = 15, function = 16, u32array = 17, boolean = 18, string = 19
 };
-
-int32_t memfd_createFast(void* p, struct FastOneByteString* const p0, uint32_t p1);
-void fastGetAddress(void* p, struct FastApiTypedArray* const p_buf, 
-  struct FastApiTypedArray* const p_ret);
-
-CTypeInfo cargsmemfd_create[3] = {
-  CTypeInfo(CTypeInfo::Type::kV8Value),
-  CTypeInfo(CTypeInfo::Type::kSeqOneByteString),
-  CTypeInfo(CTypeInfo::Type::kUint32),
-};
-CTypeInfo rcmemfd_create = CTypeInfo(CTypeInfo::Type::kInt32);
-CFunctionInfo infomemfd_create = CFunctionInfo(rcmemfd_create, 3, cargsmemfd_create);
-CFunction pFmemfd_create = CFunction((const void*)&memfd_createFast, &infomemfd_create);
-
-
-CTypeInfo cargsgetaddress[3] = {
-  CTypeInfo(CTypeInfo::Type::kV8Value),
-  CTypeInfo(CTypeInfo::Type::kUint8, 
-    CTypeInfo::SequenceType::kIsTypedArray, CTypeInfo::Flags::kNone),
-  CTypeInfo(CTypeInfo::Type::kUint32, 
-    CTypeInfo::SequenceType::kIsTypedArray, CTypeInfo::Flags::kNone)
-};
-CTypeInfo rcgetaddress = CTypeInfo(CTypeInfo::Type::kVoid);
-CFunctionInfo infogetaddress = CFunctionInfo(rcgetaddress, 3, 
-  cargsgetaddress);
-CFunction pFgetaddress = CFunction((const void*)&fastGetAddress, 
-  &infogetaddress);
-
-void GetAddress(const FunctionCallbackInfo<Value> &args) {
-  Local<TypedArray> ta = args[0].As<TypedArray>();
-  uint8_t* ptr = (uint8_t*)ta->Buffer()->Data() + ta->ByteOffset();
-  ((uint64_t*)args[1].As<Uint32Array>()->Buffer()->Data())[0] = (uint64_t)ptr;
-}
-
-void fastGetAddress(void* p, struct FastApiTypedArray* const p_buf, 
-  struct FastApiTypedArray* const p_ret) {
-  ((uint64_t*)p_ret->data)[0] = (uint64_t)p_buf->data;
-}
-
-void method_memfd_create(const FunctionCallbackInfo<Value>& args) {
-  Isolate *isolate = args.GetIsolate();
-  String::Utf8Value v0(isolate, args[0]);
-  uint32_t v1 = Local<Integer>::Cast(args[1])->Value();
-  int32_t rc = memfd_create(*v0, v1);
-  args.GetReturnValue().Set(rc);
-}
-
-int32_t memfd_createFast(void* p, struct FastOneByteString* const p0, uint32_t p1) {
-  struct FastOneByteString* const v0 = p0;
-  uint32_t v1 = p1;
-  return memfd_create(v0->data, v1);
-}
-
-void FreeMemory(void* buf, size_t length, void* data) {
-  free(buf);
-}
-
-void WrapMemory(const FunctionCallbackInfo<Value> &args) {
-  Isolate* isolate = args.GetIsolate();
-  uint64_t start64 = (uint64_t)Local<Number>::Cast(args[0])->Value();
-  uint32_t size = (uint32_t)Local<Integer>::Cast(args[1])->Value();
-  void* start = reinterpret_cast<void*>(start64);
-  int32_t free_memory = 0;
-  if (args.Length() > 2) {
-    free_memory = (int32_t)Local<Integer>::Cast(args[2])->Value();
-  }
-  if (free_memory == 0) {
-    std::unique_ptr<BackingStore> backing = ArrayBuffer::NewBackingStore(
-        start, size, v8::BackingStore::EmptyDeleter, nullptr);
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, std::move(backing));
-    args.GetReturnValue().Set(ab);
-    return;
-  }
-  std::unique_ptr<BackingStore> backing = ArrayBuffer::NewBackingStore(
-      start, size, FreeMemory, nullptr);
-  Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, std::move(backing));
-  args.GetReturnValue().Set(ab);
-}
-
-void UnwrapMemory(const FunctionCallbackInfo<Value> &args) {
-  Local<ArrayBuffer> ab = args[0].As<ArrayBuffer>();
-  ab->Detach();
-}
 
 struct fastcall {
   void* wrapper;      // 0-7   :   v8 fastcall wrapper function pointer
@@ -122,6 +40,10 @@ inline uint8_t needsunwrap (FastTypes t) {
   if (t == FastTypes::u64) return 1;
   if (t == FastTypes::i64) return 1;
   return 0;
+}
+
+void FreeMemory(void* buf, size_t length, void* data) {
+  free(buf);
 }
 
 CTypeInfo* CTypeFromV8 (uint8_t v8Type) {
@@ -316,6 +238,17 @@ void SlowCallback(const FunctionCallbackInfo<Value> &args) {
   }
 }
 
+void get_addressSlow(const FunctionCallbackInfo<Value> &args) {
+  Local<TypedArray> ta = args[0].As<TypedArray>();
+  uint8_t* ptr = (uint8_t*)ta->Buffer()->Data() + ta->ByteOffset();
+  ((uint64_t*)args[1].As<Uint32Array>()->Buffer()->Data())[0] = (uint64_t)ptr;
+}
+
+void get_addressFast(void* p, struct FastApiTypedArray* const p_buf, 
+  struct FastApiTypedArray* const p_ret) {
+  ((uint64_t*)p_ret->data)[0] = (uint64_t)p_buf->data;
+}
+
 void bind_fastcallSlow(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
@@ -370,15 +303,253 @@ void bind_slowcallSlow(const FunctionCallbackInfo<Value> &args) {
   args.GetReturnValue().Set(fun);
 }
 
+void wrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
+  Isolate* isolate = args.GetIsolate();
+  uint64_t start64 = (uint64_t)Local<Number>::Cast(args[0])->Value();
+  uint32_t size = (uint32_t)Local<Integer>::Cast(args[1])->Value();
+  void* start = reinterpret_cast<void*>(start64);
+  int32_t free_memory = 0;
+  if (args.Length() > 2) {
+    free_memory = (int32_t)Local<Integer>::Cast(args[2])->Value();
+  }
+  if (free_memory == 0) {
+    std::unique_ptr<BackingStore> backing = ArrayBuffer::NewBackingStore(
+        start, size, v8::BackingStore::EmptyDeleter, nullptr);
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, std::move(backing));
+    args.GetReturnValue().Set(ab);
+    return;
+  }
+  std::unique_ptr<BackingStore> backing = ArrayBuffer::NewBackingStore(
+      start, size, FreeMemory, nullptr);
+  Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, std::move(backing));
+  args.GetReturnValue().Set(ab);
+}
+
+void unwrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
+  Local<ArrayBuffer> ab = args[0].As<ArrayBuffer>();
+  ab->Detach();
+}
+
+
+
+void dlsymFast(void* p, void* p0, struct FastOneByteString* const p1, struct FastApiTypedArray* const p_ret);
+v8::CTypeInfo cargsdlsym[4] = {
+  v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kSeqOneByteString),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32, v8::CTypeInfo::SequenceType::kIsTypedArray, v8::CTypeInfo::Flags::kNone)
+};
+v8::CTypeInfo rcdlsym = v8::CTypeInfo(v8::CTypeInfo::Type::kVoid);
+v8::CFunctionInfo infodlsym = v8::CFunctionInfo(rcdlsym, 4, cargsdlsym);
+v8::CFunction pFdlsym = v8::CFunction((const void*)&dlsymFast, &infodlsym);
+
+
+void dlsymSlow(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  void* v0 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[0])->Value());
+  String::Utf8Value v1(isolate, args[1]);
+  void* rc = dlsym(v0, *v1);
+  Local<ArrayBuffer> ab = args[2].As<Uint32Array>()->Buffer();
+  ((void**)ab->Data())[0] = rc;
+}
+
+void dlsymFast(void* p, void* p0, struct FastOneByteString* const p1, struct FastApiTypedArray* const p_ret) {
+  void* v0 = reinterpret_cast<void*>(p0);
+  struct FastOneByteString* const v1 = p1;
+  void* r = dlsym(v0, v1->data);
+  ((void**)p_ret->data)[0] = r;
+
+}
+
+int32_t mprotectFast(void* p, void* p0, uint32_t p1, int32_t p2);
+v8::CTypeInfo cargsmprotect[4] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+};
+v8::CTypeInfo rcmprotect = v8::CTypeInfo(v8::CTypeInfo::Type::kInt32);
+v8::CFunctionInfo infomprotect = v8::CFunctionInfo(rcmprotect, 4, cargsmprotect);
+v8::CFunction pFmprotect = v8::CFunction((const void*)&mprotectFast, &infomprotect);
+
+
+void mprotectSlow(const FunctionCallbackInfo<Value> &args) {
+  void* v0 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[0])->Value());
+  uint32_t v1 = Local<Integer>::Cast(args[1])->Value();
+  int32_t v2 = Local<Integer>::Cast(args[2])->Value();
+  int32_t rc = mprotect(v0, v1, v2);
+  args.GetReturnValue().Set(rc);
+}
+
+int32_t mprotectFast(void* p, void* p0, uint32_t p1, int32_t p2) {
+  void* v0 = reinterpret_cast<void*>(p0);
+  uint32_t v1 = p1;
+  int32_t v2 = p2;
+  return mprotect(v0, v1, v2);
+}
+
+void memcpyFast(void* p, void* p0, void* p1, uint32_t p2, struct FastApiTypedArray* const p_ret);
+v8::CTypeInfo cargsmemcpy[5] = {
+  v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32, v8::CTypeInfo::SequenceType::kIsTypedArray, v8::CTypeInfo::Flags::kNone)
+};
+v8::CTypeInfo rcmemcpy = v8::CTypeInfo(v8::CTypeInfo::Type::kVoid);
+v8::CFunctionInfo infomemcpy = v8::CFunctionInfo(rcmemcpy, 5, cargsmemcpy);
+v8::CFunction pFmemcpy = v8::CFunction((const void*)&memcpyFast, &infomemcpy);
+
+
+void memcpySlow(const FunctionCallbackInfo<Value> &args) {
+  void* v0 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[0])->Value());
+  void* v1 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[1])->Value());
+  uint32_t v2 = Local<Integer>::Cast(args[2])->Value();
+  void* rc = memcpy(v0, v1, v2);
+  Local<ArrayBuffer> ab = args[3].As<Uint32Array>()->Buffer();
+  ((void**)ab->Data())[0] = rc;
+}
+
+void memcpyFast(void* p, void* p0, void* p1, uint32_t p2, struct FastApiTypedArray* const p_ret) {
+  void* v0 = reinterpret_cast<void*>(p0);
+  void* v1 = reinterpret_cast<void*>(p1);
+  uint32_t v2 = p2;
+  void* r = memcpy(v0, v1, v2);
+  ((void**)p_ret->data)[0] = r;
+
+}
+
+void mmapFast(void* p, void* p0, uint32_t p1, int32_t p2, int32_t p3, int32_t p4, uint32_t p5, struct FastApiTypedArray* const p_ret);
+v8::CTypeInfo cargsmmap[8] = {
+  v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32, v8::CTypeInfo::SequenceType::kIsTypedArray, v8::CTypeInfo::Flags::kNone)
+};
+v8::CTypeInfo rcmmap = v8::CTypeInfo(v8::CTypeInfo::Type::kVoid);
+v8::CFunctionInfo infommap = v8::CFunctionInfo(rcmmap, 8, cargsmmap);
+v8::CFunction pFmmap = v8::CFunction((const void*)&mmapFast, &infommap);
+
+
+void mmapSlow(const FunctionCallbackInfo<Value> &args) {
+  void* v0 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[0])->Value());
+  uint32_t v1 = Local<Integer>::Cast(args[1])->Value();
+  int32_t v2 = Local<Integer>::Cast(args[2])->Value();
+  int32_t v3 = Local<Integer>::Cast(args[3])->Value();
+  int32_t v4 = Local<Integer>::Cast(args[4])->Value();
+  uint32_t v5 = Local<Integer>::Cast(args[5])->Value();
+  void* rc = mmap(v0, v1, v2, v3, v4, v5);
+  Local<ArrayBuffer> ab = args[6].As<Uint32Array>()->Buffer();
+  ((void**)ab->Data())[0] = rc;
+}
+
+void mmapFast(void* p, void* p0, uint32_t p1, int32_t p2, int32_t p3, int32_t p4, uint32_t p5, struct FastApiTypedArray* const p_ret) {
+  void* v0 = reinterpret_cast<void*>(p0);
+  uint32_t v1 = p1;
+  int32_t v2 = p2;
+  int32_t v3 = p3;
+  int32_t v4 = p4;
+  uint32_t v5 = p5;
+  void* r = mmap(v0, v1, v2, v3, v4, v5);
+  ((void**)p_ret->data)[0] = r;
+
+}
+
+int32_t munmapFast(void* p, void* p0, uint32_t p1);
+v8::CTypeInfo cargsmunmap[3] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+};
+v8::CTypeInfo rcmunmap = v8::CTypeInfo(v8::CTypeInfo::Type::kInt32);
+v8::CFunctionInfo infomunmap = v8::CFunctionInfo(rcmunmap, 3, cargsmunmap);
+v8::CFunction pFmunmap = v8::CFunction((const void*)&munmapFast, &infomunmap);
+
+
+void munmapSlow(const FunctionCallbackInfo<Value> &args) {
+  void* v0 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[0])->Value());
+  uint32_t v1 = Local<Integer>::Cast(args[1])->Value();
+  int32_t rc = munmap(v0, v1);
+  args.GetReturnValue().Set(rc);
+}
+
+int32_t munmapFast(void* p, void* p0, uint32_t p1) {
+  void* v0 = reinterpret_cast<void*>(p0);
+  uint32_t v1 = p1;
+  return munmap(v0, v1);
+}
+
+int32_t memfd_createFast(void* p, struct FastOneByteString* const p0, uint32_t p1);
+v8::CTypeInfo cargsmemfd_create[3] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kSeqOneByteString),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+};
+v8::CTypeInfo rcmemfd_create = v8::CTypeInfo(v8::CTypeInfo::Type::kInt32);
+v8::CFunctionInfo infomemfd_create = v8::CFunctionInfo(rcmemfd_create, 3, cargsmemfd_create);
+v8::CFunction pFmemfd_create = v8::CFunction((const void*)&memfd_createFast, &infomemfd_create);
+
+
+void memfd_createSlow(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  String::Utf8Value v0(isolate, args[0]);
+  uint32_t v1 = Local<Integer>::Cast(args[1])->Value();
+  int32_t rc = memfd_create(*v0, v1);
+  args.GetReturnValue().Set(rc);
+}
+
+int32_t memfd_createFast(void* p, struct FastOneByteString* const p0, uint32_t p1) {
+  struct FastOneByteString* const v0 = p0;
+  uint32_t v1 = p1;
+  return memfd_create(v0->data, v1);
+}
+
+
+
+
+
+void get_addressFast(void* p, struct FastApiTypedArray* const p0, struct FastApiTypedArray* const p_ret);
+v8::CTypeInfo cargsget_address[3] = {
+  v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint8, CTypeInfo::SequenceType::kIsTypedArray, CTypeInfo::Flags::kNone),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32, v8::CTypeInfo::SequenceType::kIsTypedArray, v8::CTypeInfo::Flags::kNone)
+};
+v8::CTypeInfo rcget_address = v8::CTypeInfo(v8::CTypeInfo::Type::kVoid);
+v8::CFunctionInfo infoget_address = v8::CFunctionInfo(rcget_address, 3, cargsget_address);
+v8::CFunction pFget_address = v8::CFunction((const void*)&get_addressFast, &infoget_address);
+
+
+
+
+
+
+
 void Initialize(Local<Object> exports) {
   Isolate* isolate = Isolate::GetCurrent();
-  NODE_SET_FAST_METHOD(isolate, exports, "memfd_create", &pFmemfd_create, method_memfd_create);
-  NODE_SET_METHOD(exports, "wrap_memory", WrapMemory);
-  NODE_SET_FAST_METHOD(isolate, exports, "get_address", &pFgetaddress, GetAddress);
-  NODE_SET_METHOD(exports, "bind_fastcall", bind_fastcallSlow);
-  NODE_SET_METHOD(exports, "bind_slowcall", bind_slowcallSlow);
+  NODE_SET_FAST_METHOD(isolate, exports, "dlsym", &pFdlsym, dlsymSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "mprotect", &pFmprotect, mprotectSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "memcpy", &pFmemcpy, memcpySlow);
+NODE_SET_FAST_METHOD(isolate, exports, "mmap", &pFmmap, mmapSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "munmap", &pFmunmap, munmapSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "memfd_create", &pFmemfd_create, memfd_createSlow);
+NODE_SET_METHOD(exports, "bind_fastcall", bind_fastcallSlow);
+NODE_SET_METHOD(exports, "bind_slowcall", bind_slowcallSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "get_address", &pFget_address, get_addressSlow);
+NODE_SET_METHOD(exports, "wrap_memory", wrap_memorySlow);
+NODE_SET_METHOD(exports, "unwrap_memory", unwrap_memorySlow);
+    NODE_SET_VALUE(isolate, exports, "PROT_READ", Integer::New(isolate, (int32_t)PROT_READ));
+  NODE_SET_VALUE(isolate, exports, "MAP_PRIVATE", Integer::New(isolate, (int32_t)MAP_PRIVATE));
+  NODE_SET_VALUE(isolate, exports, "PROT_WRITE", Integer::New(isolate, (int32_t)PROT_WRITE));
+  NODE_SET_VALUE(isolate, exports, "PROT_EXEC", Integer::New(isolate, (int32_t)PROT_EXEC));
+  NODE_SET_VALUE(isolate, exports, "MAP_ANONYMOUS", Integer::New(isolate, (int32_t)MAP_ANONYMOUS));
+
 }
 
 NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)
 
-}  // namespace demo 
+}
+
