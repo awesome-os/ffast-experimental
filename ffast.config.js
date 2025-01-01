@@ -1,8 +1,17 @@
 const api = {
+  dlopen: {
+    parameters: ['string', 'i32'],
+    pointers: ['const char*'],
+    result: 'pointer',
+  },
   dlsym: {
     parameters: ['pointer', 'string'],
     pointers: ['void*', 'const char*'],
     result: 'pointer',
+  },
+  aligned_alloc: {
+    parameters: ['u32', 'u32'],
+    result: 'pointer'
   },
   mprotect: {
     parameters: ['pointer', 'u32', 'i32'],
@@ -55,6 +64,10 @@ const constants = {
   PROT_WRITE: 'i32', 
   PROT_EXEC: 'i32', 
   MAP_ANONYMOUS: 'i32',
+  struct_fastcall_size: 'u32',
+  RTLD_LAZY: 'i32',
+  RTLD_LOCAL: 'i32',
+  RTLD_NOLOAD: 'i32',
 }
 
 const name = 'ffast'
@@ -85,7 +98,10 @@ struct fastcall {
                       // this structure into regs + stack and make the call
                       // the first slot is reserved for the result
   void* fn;           // 296-303:  the slowcall wrapper function pointer
+  uint8_t padding[80]; // 304-383 :   an array of types of the arguments
 };
+
+int struct_fastcall_size = sizeof(struct fastcall);
 
 typedef void (*lo_fast_call)(void*);
 

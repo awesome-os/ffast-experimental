@@ -255,7 +255,7 @@ function get_source (config) {
   const src = `
 ${gen_includes(config)}
 
-namespace ffast {
+namespace ${config.namespace || 'ffast'} {
 ${config.preamble || ''}
 ${gen_handlers(config)
 }

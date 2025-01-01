@@ -29,7 +29,10 @@ struct fastcall {
                       // this structure into regs + stack and make the call
                       // the first slot is reserved for the result
   void* fn;           // 296-303:  the slowcall wrapper function pointer
+  uint8_t padding[80]; // 304-383 :   an array of types of the arguments
 };
+
+int struct_fastcall_size = sizeof(struct fastcall);
 
 typedef void (*lo_fast_call)(void*);
 
@@ -332,6 +335,35 @@ void unwrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
 
 
 
+void dlopenFast(void* p, struct FastOneByteString* const p0, int32_t p1, struct FastApiTypedArray* const p_ret);
+v8::CTypeInfo cargsdlopen[4] = {
+  v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kSeqOneByteString),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32, v8::CTypeInfo::SequenceType::kIsTypedArray, v8::CTypeInfo::Flags::kNone)
+};
+v8::CTypeInfo rcdlopen = v8::CTypeInfo(v8::CTypeInfo::Type::kVoid);
+v8::CFunctionInfo infodlopen = v8::CFunctionInfo(rcdlopen, 4, cargsdlopen);
+v8::CFunction pFdlopen = v8::CFunction((const void*)&dlopenFast, &infodlopen);
+
+
+void dlopenSlow(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  String::Utf8Value v0(isolate, args[0]);
+  int32_t v1 = Local<Integer>::Cast(args[1])->Value();
+  void* rc = dlopen(*v0, v1);
+  Local<ArrayBuffer> ab = args[2].As<Uint32Array>()->Buffer();
+  ((void**)ab->Data())[0] = rc;
+}
+
+void dlopenFast(void* p, struct FastOneByteString* const p0, int32_t p1, struct FastApiTypedArray* const p_ret) {
+  struct FastOneByteString* const v0 = p0;
+  int32_t v1 = p1;
+  void* r = dlopen(v0->data, v1);
+  ((void**)p_ret->data)[0] = r;
+
+}
+
 void dlsymFast(void* p, void* p0, struct FastOneByteString* const p1, struct FastApiTypedArray* const p_ret);
 v8::CTypeInfo cargsdlsym[4] = {
   v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
@@ -357,6 +389,34 @@ void dlsymFast(void* p, void* p0, struct FastOneByteString* const p1, struct Fas
   void* v0 = reinterpret_cast<void*>(p0);
   struct FastOneByteString* const v1 = p1;
   void* r = dlsym(v0, v1->data);
+  ((void**)p_ret->data)[0] = r;
+
+}
+
+void aligned_allocFast(void* p, uint32_t p0, uint32_t p1, struct FastApiTypedArray* const p_ret);
+v8::CTypeInfo cargsaligned_alloc[4] = {
+  v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32, v8::CTypeInfo::SequenceType::kIsTypedArray, v8::CTypeInfo::Flags::kNone)
+};
+v8::CTypeInfo rcaligned_alloc = v8::CTypeInfo(v8::CTypeInfo::Type::kVoid);
+v8::CFunctionInfo infoaligned_alloc = v8::CFunctionInfo(rcaligned_alloc, 4, cargsaligned_alloc);
+v8::CFunction pFaligned_alloc = v8::CFunction((const void*)&aligned_allocFast, &infoaligned_alloc);
+
+
+void aligned_allocSlow(const FunctionCallbackInfo<Value> &args) {
+  uint32_t v0 = Local<Integer>::Cast(args[0])->Value();
+  uint32_t v1 = Local<Integer>::Cast(args[1])->Value();
+  void* rc = aligned_alloc(v0, v1);
+  Local<ArrayBuffer> ab = args[2].As<Uint32Array>()->Buffer();
+  ((void**)ab->Data())[0] = rc;
+}
+
+void aligned_allocFast(void* p, uint32_t p0, uint32_t p1, struct FastApiTypedArray* const p_ret) {
+  uint32_t v0 = p0;
+  uint32_t v1 = p1;
+  void* r = aligned_alloc(v0, v1);
   ((void**)p_ret->data)[0] = r;
 
 }
@@ -530,7 +590,9 @@ v8::CFunction pFget_address = v8::CFunction((const void*)&get_addressFast, &info
 
 void Initialize(Local<Object> exports) {
   Isolate* isolate = Isolate::GetCurrent();
-  NODE_SET_FAST_METHOD(isolate, exports, "dlsym", &pFdlsym, dlsymSlow);
+  NODE_SET_FAST_METHOD(isolate, exports, "dlopen", &pFdlopen, dlopenSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "dlsym", &pFdlsym, dlsymSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "aligned_alloc", &pFaligned_alloc, aligned_allocSlow);
 NODE_SET_FAST_METHOD(isolate, exports, "mprotect", &pFmprotect, mprotectSlow);
 NODE_SET_FAST_METHOD(isolate, exports, "memcpy", &pFmemcpy, memcpySlow);
 NODE_SET_FAST_METHOD(isolate, exports, "mmap", &pFmmap, mmapSlow);
@@ -546,6 +608,10 @@ NODE_SET_METHOD(exports, "unwrap_memory", unwrap_memorySlow);
   NODE_SET_VALUE(isolate, exports, "PROT_WRITE", Integer::New(isolate, (int32_t)PROT_WRITE));
   NODE_SET_VALUE(isolate, exports, "PROT_EXEC", Integer::New(isolate, (int32_t)PROT_EXEC));
   NODE_SET_VALUE(isolate, exports, "MAP_ANONYMOUS", Integer::New(isolate, (int32_t)MAP_ANONYMOUS));
+  NODE_SET_VALUE(isolate, exports, "struct_fastcall_size", Integer::New(isolate, (uint32_t)struct_fastcall_size));
+  NODE_SET_VALUE(isolate, exports, "RTLD_LAZY", Integer::New(isolate, (int32_t)RTLD_LAZY));
+  NODE_SET_VALUE(isolate, exports, "RTLD_LOCAL", Integer::New(isolate, (int32_t)RTLD_LOCAL));
+  NODE_SET_VALUE(isolate, exports, "RTLD_NOLOAD", Integer::New(isolate, (int32_t)RTLD_NOLOAD));
 
 }
 
