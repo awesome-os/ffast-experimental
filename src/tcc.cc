@@ -376,4 +376,3 @@ NODE_SET_FAST_METHOD(isolate, exports, "list_symbols", &pFlist_symbols, list_sym
 NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)
 
 }
-

@@ -116,4 +116,3 @@ NODE_SET_FAST_METHOD(isolate, exports, "memcount_avx2", &pFmemcount_avx2, memcou
 NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)
 
 }
-

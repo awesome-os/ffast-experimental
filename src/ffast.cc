@@ -688,4 +688,3 @@ NODE_SET_FAST_METHOD(isolate, exports, "madvise", &pFmadvise, madviseSlow);
 NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)
 
 }
-

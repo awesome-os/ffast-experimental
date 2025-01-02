@@ -56,4 +56,3 @@ NODE_SET_FAST_METHOD(isolate, exports, "fork", &pFfork, forkSlow);
 NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)
 
 }
-

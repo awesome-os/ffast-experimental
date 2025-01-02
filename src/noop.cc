@@ -42,4 +42,3 @@ NODE_SET_METHOD(exports, "noop_slow", noop_slowSlow);
 NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)
 
 }
-

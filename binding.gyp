@@ -1,48 +1,9 @@
 {
   "targets": [
     {
-      "target_name": "ffast",
+      "target_name": "linecount",
       "sources": [
-        "ffast.cc"
-      ],
-      "cflags_cc": [
-        "-O3",
-        "-march=native",
-        "-mtune=native"
-      ]
-    },
-    {
-      "target_name": "noop",
-      "sources": [
-        "noop.cc"
-      ],
-      "cflags_cc": [
-        "-O3",
-        "-march=native",
-        "-mtune=native"
-      ]
-    },
-    {
-      "target_name": "tcc",
-      "include_dirs": [
-        "../lo/lib/tcc/deps/libtcc"
-      ],
-      "libraries": [
-        "/media/andrew/OCZ/source2023/just-js/lo/lib/tcc/deps/libtcc/libtcc.a"
-      ],
-      "sources": [
-        "tcc.cc"
-      ],
-      "cflags_cc": [
-        "-O3",
-        "-march=native",
-        "-mtune=native"
-      ]
-    },
-    {
-      "target_name": "count",
-      "sources": [
-        "count.cc"
+        "src/linecount.cc"
       ],
       "cflags_cc": [
         "-O3",
@@ -53,13 +14,57 @@
     {
       "target_name": "demo",
       "sources": [
-        "demo.cc"
+        "src/demo.cc"
+      ],
+      "cflags_cc": [
+        "-O3",
+        "-march=native",
+        "-mtune=native"
       ]
     },
     {
-      "target_name": "linecount",
+      "target_name": "count",
       "sources": [
-        "linecount.cc"
+        "src/count.cc"
+      ],
+      "cflags_cc": [
+        "-O3",
+        "-march=native",
+        "-mtune=native"
+      ]
+    },
+    {
+      "target_name": "ffast",
+      "sources": [
+        "src/ffast.cc"
+      ],
+      "cflags_cc": [
+        "-O3",
+        "-march=native",
+        "-mtune=native"
+      ]
+    },
+    {
+      "target_name": "tcc",
+      "sources": [
+        "src/tcc.cc"
+      ],
+      "cflags_cc": [
+        "-O3",
+        "-march=native",
+        "-mtune=native"
+      ],
+      "include_dirs": [
+        "../lo/lib/tcc/deps/libtcc"
+      ],
+      "libraries": [
+        "/media/andrew/OCZ/source2023/just-js/lo/lib/tcc/deps/libtcc/libtcc.a"
+      ]
+    },
+    {
+      "target_name": "noop",
+      "sources": [
+        "src/noop.cc"
       ],
       "cflags_cc": [
         "-O3",
