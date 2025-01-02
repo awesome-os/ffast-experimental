@@ -45,7 +45,7 @@ void NODE_SET_VALUE(Isolate *isolate, Local<Object>
   Local<Context> context = isolate->GetCurrentContext();
   recv->Set(context, String::NewFromUtf8(isolate, name, 
     NewStringType::kInternalized).ToLocalChecked(), 
-    value);
+    value).Check();
 }
 
 void NODE_SET_FAST_METHOD(Isolate* isolate, Local<Object> 

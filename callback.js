@@ -1,17 +1,7 @@
-import { spawnSync } from 'node:child_process'
-import { lstatSync } from 'node:fs'
 import * as ffast from './lib/ffast.js'
 
 function mem () {
   return process.memoryUsage().rss
-}
-
-function isFile (path) {
-  try {
-    return lstatSync(path).isFile()
-  } catch (err) {
-    return false
-  }
 }
 
 function real_callback (counter) {
@@ -45,11 +35,6 @@ const {
   Registers
 } = ffast
 const { rax, rdi, r15 } = Registers
-if (!isFile('./callback.so')) {
-  const compiler = 'gcc'
-  const args = '-fPIC -O3 -march=native -mtune=native -s -shared -o callback.so callback.c'
-  assert(spawnSync(compiler, args.split(' ')).status === 0)
-}
 const handle = assert(dlopen('./callback.so', 1))
 const get_callback_address = wrap(uh, ffast.get_callback_address, 0)
 const register_callback_c = bind(assert(dlsym(handle, 'register_callback')), 'void', ['pointer'])

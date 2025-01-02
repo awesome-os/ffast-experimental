@@ -2,7 +2,7 @@ import { gen_source, gen_gyp } from './lib/gen.js'
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const [ name ]  = process.argv.slice(2)
-const config = await import (`./${name}.config.js`)
+const config = await import (`./bindings/${name}.config.js`)
 writeFileSync(`src/${name}.cc`, gen_source(config))
 const target = gen_gyp(config)
 const bindings = JSON.parse(readFileSync('binding.gyp'))
