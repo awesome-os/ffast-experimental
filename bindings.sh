@@ -1,5 +1,5 @@
 #!/bin/bash
-if ! test -f v8-fast-api-calls.h; then
+if ! test -f src/v8-fast-api-calls.h; then
   echo "downloading src.v8-fast-api-calls.h"
   V8_VERSION=$(node -e "console.log(process.versions.v8.substring(0, process.versions.v8.indexOf('-')))")
   URL="https://raw.githubusercontent.com/v8/v8/refs/tags/$V8_VERSION/include/v8-fast-api-calls.h"

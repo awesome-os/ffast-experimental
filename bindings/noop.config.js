@@ -13,7 +13,9 @@ const api = {
 }
 
 const preamble = [
+  'extern "C" {',
   'void noop () {',
+  '}',
   '}'
 ].join('\n')
 

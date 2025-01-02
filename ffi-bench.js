@@ -4,7 +4,7 @@ import { bind, assert, dlsym, dlopen, RTLD_NOW, RTLD_LOCAL } from './lib/ffast.j
 import { Bench } from './lib/bench.js'
 
 const handle = assert(dlopen('./build/Release/noop.node', RTLD_NOW | RTLD_LOCAL))
-const sym = dlsym(handle, 'noop')
+const sym = assert(dlsym(handle, 'noop'))
 //const noop = createRequire(import.meta.url)('./build/Release/noop.node')
 
 const compiler = new Compiler()
@@ -21,7 +21,6 @@ const noop_fast_ffi_tcc = bind(compiler.symbol('noop'), 'void', [])
 const noop_slow_ffi_tcc = bind(compiler.symbol('noop'), 'void', [], true)
 
 //const { noop_fast, noop_slow } = noop
-
 const bench = new Bench()
 
 while (1) {

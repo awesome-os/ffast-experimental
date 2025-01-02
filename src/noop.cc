@@ -2,7 +2,9 @@
 #include "ffast.h"
 
 namespace ffast {
+extern "C" {
 void noop () {
+}
 }
 
 void noop_fastFast(void* p);
