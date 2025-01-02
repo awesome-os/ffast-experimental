@@ -10,13 +10,19 @@ function measure (runs) {
 }
 
 function real_callback () {
-  if ((u32[4] = u32[6] + 1) === runs) {
-    stop()
-    measure(runs)
-    if (--total) {
-      u32[4] = 0
-      process.nextTick(start)
+  try {
+//    throw new Error('Foo')
+    if ((u32[4] = u32[6] + 1) === runs) {
+      stop()
+      measure(runs)
+      if (--total) {
+        u32[4] = 0
+        process.nextTick(start)
+      }
     }
+  } catch (err) {
+    console.log(err.stack)
+    stop()
   }
 }
 

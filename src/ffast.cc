@@ -12,6 +12,8 @@ using v8::ObjectTemplate;
 using v8::TypedArray;
 using v8::Global;
 using v8::BigInt;
+using v8::MaybeLocal;
+using v8::TryCatch;
 
 enum FastTypes: int {
   i8 = 1, i16 = 2, i32 = 3, u8 = 4, u16 = 5, u32 = 6, empty = 7, f32 = 8,
@@ -49,7 +51,14 @@ void lo_callback (exec_info* info) {
   Isolate* isolate = info->isolate;
   HandleScope scope(isolate);
   info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
-    v8::Null(isolate), 0, 0).ToLocalChecked();
+    v8::Null(isolate), 0, 0);
+//  TryCatch try_catch(isolate);
+//  MaybeLocal<Value> result = info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
+//    v8::Null(isolate), 0, 0);
+//  if (result.IsEmpty() && try_catch.HasCaught()) {
+//    try_catch.ReThrow();
+//  }
+//  TODO: this needs to return a value
 }
 
 inline uint8_t needsunwrap (FastTypes t) {
@@ -650,6 +659,47 @@ int32_t madviseFast(void* p, void* p0, uint32_t p1, int32_t p2) {
   return madvise(v0, v1, v2);
 }
 
+void sleepFast(void* p, int32_t p0);
+v8::CTypeInfo cargssleep[2] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+};
+v8::CTypeInfo rcsleep = v8::CTypeInfo(v8::CTypeInfo::Type::kVoid);
+v8::CFunctionInfo infosleep = v8::CFunctionInfo(rcsleep, 2, cargssleep);
+v8::CFunction pFsleep = v8::CFunction((const void*)&sleepFast, &infosleep);
+
+
+void sleepSlow(const FunctionCallbackInfo<Value> &args) {
+  int32_t v0 = Local<Integer>::Cast(args[0])->Value();
+  sleep(v0);
+}
+
+void sleepFast(void* p, int32_t p0) {
+  int32_t v0 = p0;
+  sleep(v0);
+}
+
+int32_t usleepFast(void* p, uint32_t p0);
+v8::CTypeInfo cargsusleep[2] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+};
+v8::CTypeInfo rcusleep = v8::CTypeInfo(v8::CTypeInfo::Type::kInt32);
+v8::CFunctionInfo infousleep = v8::CFunctionInfo(rcusleep, 2, cargsusleep);
+v8::CFunction pFusleep = v8::CFunction((const void*)&usleepFast, &infousleep);
+
+
+void usleepSlow(const FunctionCallbackInfo<Value> &args) {
+  uint32_t v0 = Local<Integer>::Cast(args[0])->Value();
+  int32_t rc = usleep(v0);
+  args.GetReturnValue().Set(rc);
+}
+
+int32_t usleepFast(void* p, uint32_t p0) {
+  uint32_t v0 = p0;
+  return usleep(v0);
+}
+
 void Initialize(Local<Object> exports) {
   Isolate* isolate = Isolate::GetCurrent();
   NODE_SET_FAST_METHOD(isolate, exports, "dlopen", &pFdlopen, dlopenSlow);
@@ -668,6 +718,8 @@ NODE_SET_METHOD(exports, "get_callback_address", get_callback_addressSlow);
 NODE_SET_METHOD(exports, "wrap_memory", wrap_memorySlow);
 NODE_SET_METHOD(exports, "unwrap_memory", unwrap_memorySlow);
 NODE_SET_FAST_METHOD(isolate, exports, "madvise", &pFmadvise, madviseSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "sleep", &pFsleep, sleepSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "usleep", &pFusleep, usleepSlow);
     NODE_SET_VALUE(isolate, exports, "PROT_READ", Integer::New(isolate, (int32_t)PROT_READ));
   NODE_SET_VALUE(isolate, exports, "MAP_PRIVATE", Integer::New(isolate, (int32_t)MAP_PRIVATE));
   NODE_SET_VALUE(isolate, exports, "PROT_WRITE", Integer::New(isolate, (int32_t)PROT_WRITE));

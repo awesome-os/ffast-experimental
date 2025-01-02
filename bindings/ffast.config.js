@@ -68,6 +68,14 @@ const api = {
     parameters: ['pointer', 'u32', 'i32'],
     result: 'i32'
   },
+  sleep: {
+    parameters: ['i32'],
+    result: 'void'
+  },
+  usleep: {
+    parameters: ['u32'],
+    result: 'i32'
+  },
 }
 
 const constants = {
@@ -98,6 +106,8 @@ using v8::ObjectTemplate;
 using v8::TypedArray;
 using v8::Global;
 using v8::BigInt;
+using v8::MaybeLocal;
+using v8::TryCatch;
 
 enum FastTypes: int {
   i8 = 1, i16 = 2, i32 = 3, u8 = 4, u16 = 5, u32 = 6, empty = 7, f32 = 8,
@@ -135,7 +145,14 @@ void lo_callback (exec_info* info) {
   Isolate* isolate = info->isolate;
   HandleScope scope(isolate);
   info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
-    v8::Null(isolate), 0, 0).ToLocalChecked();
+    v8::Null(isolate), 0, 0);
+//  TryCatch try_catch(isolate);
+//  MaybeLocal<Value> result = info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
+//    v8::Null(isolate), 0, 0);
+//  if (result.IsEmpty() && try_catch.HasCaught()) {
+//    try_catch.ReThrow();
+//  }
+//  TODO: this needs to return a value
 }
 
 inline uint8_t needsunwrap (FastTypes t) {
