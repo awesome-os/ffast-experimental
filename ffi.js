@@ -1,10 +1,8 @@
-const { Assembler, Registers } = require('./lib/assembler.js')
-const { Compiler } = require('./lib/compiler.js')
-const { 
+import { 
   assert, ptr, dlopen, dlsym, aligned_alloc, wrap_memory, 
-  RTLD_LAZY, RTLD_LOCAL, RTLD_NOLOAD,
-} = require('./lib/ffast.js')
-const { rdi, rsi, rbx, rax } = Registers
+  RTLD_LAZY, RTLD_LOCAL, RTLD_NOLOAD, bind_custom,
+  compiler, asm, Registers
+} from './lib/ffast.js'
 
 function bind_parse (read_buf) {
   if (!read_buf.ptr) ptr(read_buf)
@@ -35,11 +33,12 @@ function bind_parse (read_buf) {
   asm.ret()
   const slow_addr = compiler.compile(asm.bytes())
 
-  return { parse: bind('i32', ['u32'], false, fast_addr, slow_addr) }
+  return { parse: bind_custom('i32', ['u32'], false, fast_addr, slow_addr) }
 }
 
 function bind_gettime () {
-  const vdso_sym = assert(dlsym(assert(dlopen('linux-vdso.so.1', RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD)), '__vdso_clock_gettime'))
+  const vdso_sym = assert(dlsym(assert(dlopen('linux-vdso.so.1', RTLD_LAZY | 
+    RTLD_LOCAL | RTLD_NOLOAD)), '__vdso_clock_gettime'))
 
   asm.reset()
   asm.movabs(CLOCK_BOOTTIME, rdi)
@@ -58,29 +57,22 @@ function bind_gettime () {
   asm.ret()
   const slow_addr = compiler.compile(asm.bytes())
 
-  return { gettime: bind('i32', [], false, fast_addr, slow_addr) }
+  return { gettime: bind_custom('i32', [], false, fast_addr, slow_addr) }
 }
 
-const asm = new Assembler()
-const compiler = new Compiler()
-
+const { rdi, rsi, rbx, rax } = Registers
 const num_headers = 16
 const headers_size = (4 * 8 * num_headers)
 const state_len = (6 * 8) + headers_size
-
 const read_buf = ptr(new Uint8Array(16384))
 const { parse } = bind_parse(read_buf)
-
 const encoder = new TextEncoder()
 const payload = encoder.encode('GET / HTTP/1.1\r\n\r\n')
 read_buf.set(payload, 0)
 const expected = payload.length
 assert(parse(expected) === expected)
-
-
 const CLOCK_BOOTTIME = 7
 const timespec = ptr(new Uint32Array(4))
-
 const { gettime } = bind_gettime()
 assert(gettime() === 0)
 

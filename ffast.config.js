@@ -41,9 +41,17 @@ const api = {
     declare_only: true,
     nofast: true
   },
+  register_callback: {
+    declare_only: true,
+    nofast: true
+  },
   get_address: {
     parameters: ['buffer'],
     declare_only: true,
+  },
+  get_callback_address: {
+    declare_only: true,
+    nofast: true
   },
   wrap_memory: {
     parameters: ['pointer', 'u32', 'i32'],
@@ -55,6 +63,10 @@ const api = {
     parameters: ['buffer'],
     declare_only: true,
     nofast: true
+  },
+  madvise: {
+    parameters: ['pointer', 'u32', 'i32'],
+    result: 'i32'
   },
 }
 
@@ -68,6 +80,11 @@ const constants = {
   RTLD_LAZY: 'i32',
   RTLD_LOCAL: 'i32',
   RTLD_NOLOAD: 'i32',
+  RTLD_NOW: 'i32',
+  RTLD_GLOBAL: 'i32',
+  RTLD_DEFAULT: 'u64',
+  RTLD_NEXT: 'u64',
+  MADV_HUGEPAGE: 'i32',
 }
 
 const name = 'ffast'
@@ -79,6 +96,8 @@ using v8::Uint8Array;
 using v8::Uint32Array;
 using v8::ObjectTemplate;
 using v8::TypedArray;
+using v8::Global;
+using v8::BigInt;
 
 enum FastTypes: int {
   i8 = 1, i16 = 2, i32 = 3, u8 = 4, u16 = 5, u32 = 6, empty = 7, f32 = 8,
@@ -104,6 +123,20 @@ struct fastcall {
 int struct_fastcall_size = sizeof(struct fastcall);
 
 typedef void (*lo_fast_call)(void*);
+
+struct exec_info {
+  v8::Global<v8::Function> js_fn;
+  v8::Isolate* isolate;
+  uint64_t rv;
+  int nargs;
+};
+
+void lo_callback (exec_info* info) {
+  Isolate* isolate = info->isolate;
+  HandleScope scope(isolate);
+  info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
+    v8::Null(isolate), 0, 0).ToLocalChecked();
+}
 
 inline uint8_t needsunwrap (FastTypes t) {
   if (t == FastTypes::buffer) return 1;
@@ -321,6 +354,10 @@ void get_addressFast(void* p, struct FastApiTypedArray* const p_buf,
   ((uint64_t*)p_ret->data)[0] = (uint64_t)p_buf->data;
 }
 
+void get_callback_addressSlow(const FunctionCallbackInfo<Value> &args) {
+  ((uint64_t*)args[0].As<Uint32Array>()->Buffer()->Data())[0] = (uint64_t)&lo_callback;
+}
+
 void bind_fastcallSlow(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
@@ -386,7 +423,7 @@ void wrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
   }
   if (free_memory == 0) {
     std::unique_ptr<BackingStore> backing = ArrayBuffer::NewBackingStore(
-        start, size, v8::BackingStore::EmptyDeleter, nullptr);
+        start, size, [](void*, size_t, void*){}, nullptr);
     Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, std::move(backing));
     args.GetReturnValue().Set(ab);
     return;
@@ -400,6 +437,17 @@ void wrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
 void unwrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
   Local<ArrayBuffer> ab = args[0].As<ArrayBuffer>();
   ab->Detach();
+}
+
+void register_callbackSlow(const FunctionCallbackInfo<Value>& args) {
+  struct exec_info* info = reinterpret_cast<struct exec_info*>(
+    (uint64_t)Local<Integer>::Cast(args[0])->Value());
+  Local<Function> fn = args[1].As<Function>();
+  int nargs = Local<Integer>::Cast(args[2])->Value();
+  Isolate* isolate = args.GetIsolate();
+  info->isolate = isolate;
+  info->nargs = nargs;
+  info->js_fn.Reset(isolate, Global<Function>(isolate, fn));
 }
 
 `

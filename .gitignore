@@ -2,3 +2,6 @@ build
 v8-fast-api-calls.h
 scratch
 demo
+*.so
+micro-c
+.vscode

@@ -10,6 +10,8 @@ using v8::Uint8Array;
 using v8::Uint32Array;
 using v8::ObjectTemplate;
 using v8::TypedArray;
+using v8::Global;
+using v8::BigInt;
 
 enum FastTypes: int {
   i8 = 1, i16 = 2, i32 = 3, u8 = 4, u16 = 5, u32 = 6, empty = 7, f32 = 8,
@@ -35,6 +37,20 @@ struct fastcall {
 int struct_fastcall_size = sizeof(struct fastcall);
 
 typedef void (*lo_fast_call)(void*);
+
+struct exec_info {
+  v8::Global<v8::Function> js_fn;
+  v8::Isolate* isolate;
+  uint64_t rv;
+  int nargs;
+};
+
+void lo_callback (exec_info* info) {
+  Isolate* isolate = info->isolate;
+  HandleScope scope(isolate);
+  info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
+    v8::Null(isolate), 0, 0).ToLocalChecked();
+}
 
 inline uint8_t needsunwrap (FastTypes t) {
   if (t == FastTypes::buffer) return 1;
@@ -252,6 +268,10 @@ void get_addressFast(void* p, struct FastApiTypedArray* const p_buf,
   ((uint64_t*)p_ret->data)[0] = (uint64_t)p_buf->data;
 }
 
+void get_callback_addressSlow(const FunctionCallbackInfo<Value> &args) {
+  ((uint64_t*)args[0].As<Uint32Array>()->Buffer()->Data())[0] = (uint64_t)&lo_callback;
+}
+
 void bind_fastcallSlow(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
@@ -317,7 +337,7 @@ void wrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
   }
   if (free_memory == 0) {
     std::unique_ptr<BackingStore> backing = ArrayBuffer::NewBackingStore(
-        start, size, v8::BackingStore::EmptyDeleter, nullptr);
+        start, size, [](void*, size_t, void*){}, nullptr);
     Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, std::move(backing));
     args.GetReturnValue().Set(ab);
     return;
@@ -331,6 +351,17 @@ void wrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
 void unwrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
   Local<ArrayBuffer> ab = args[0].As<ArrayBuffer>();
   ab->Detach();
+}
+
+void register_callbackSlow(const FunctionCallbackInfo<Value>& args) {
+  struct exec_info* info = reinterpret_cast<struct exec_info*>(
+    (uint64_t)Local<Integer>::Cast(args[0])->Value());
+  Local<Function> fn = args[1].As<Function>();
+  int nargs = Local<Integer>::Cast(args[2])->Value();
+  Isolate* isolate = args.GetIsolate();
+  info->isolate = isolate;
+  info->nargs = nargs;
+  info->js_fn.Reset(isolate, Global<Function>(isolate, fn));
 }
 
 
@@ -572,6 +603,8 @@ int32_t memfd_createFast(void* p, struct FastOneByteString* const p0, uint32_t p
 
 
 
+
+
 void get_addressFast(void* p, struct FastApiTypedArray* const p0, struct FastApiTypedArray* const p_ret);
 v8::CTypeInfo cargsget_address[3] = {
   v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
@@ -588,6 +621,35 @@ v8::CFunction pFget_address = v8::CFunction((const void*)&get_addressFast, &info
 
 
 
+
+
+int32_t madviseFast(void* p, void* p0, uint32_t p1, int32_t p2);
+v8::CTypeInfo cargsmadvise[4] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+};
+v8::CTypeInfo rcmadvise = v8::CTypeInfo(v8::CTypeInfo::Type::kInt32);
+v8::CFunctionInfo infomadvise = v8::CFunctionInfo(rcmadvise, 4, cargsmadvise);
+v8::CFunction pFmadvise = v8::CFunction((const void*)&madviseFast, &infomadvise);
+
+
+void madviseSlow(const FunctionCallbackInfo<Value> &args) {
+  void* v0 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[0])->Value());
+  uint32_t v1 = Local<Integer>::Cast(args[1])->Value();
+  int32_t v2 = Local<Integer>::Cast(args[2])->Value();
+  int32_t rc = madvise(v0, v1, v2);
+  args.GetReturnValue().Set(rc);
+}
+
+int32_t madviseFast(void* p, void* p0, uint32_t p1, int32_t p2) {
+  void* v0 = reinterpret_cast<void*>(p0);
+  uint32_t v1 = p1;
+  int32_t v2 = p2;
+  return madvise(v0, v1, v2);
+}
+
 void Initialize(Local<Object> exports) {
   Isolate* isolate = Isolate::GetCurrent();
   NODE_SET_FAST_METHOD(isolate, exports, "dlopen", &pFdlopen, dlopenSlow);
@@ -600,9 +662,12 @@ NODE_SET_FAST_METHOD(isolate, exports, "munmap", &pFmunmap, munmapSlow);
 NODE_SET_FAST_METHOD(isolate, exports, "memfd_create", &pFmemfd_create, memfd_createSlow);
 NODE_SET_METHOD(exports, "bind_fastcall", bind_fastcallSlow);
 NODE_SET_METHOD(exports, "bind_slowcall", bind_slowcallSlow);
+NODE_SET_METHOD(exports, "register_callback", register_callbackSlow);
 NODE_SET_FAST_METHOD(isolate, exports, "get_address", &pFget_address, get_addressSlow);
+NODE_SET_METHOD(exports, "get_callback_address", get_callback_addressSlow);
 NODE_SET_METHOD(exports, "wrap_memory", wrap_memorySlow);
 NODE_SET_METHOD(exports, "unwrap_memory", unwrap_memorySlow);
+NODE_SET_FAST_METHOD(isolate, exports, "madvise", &pFmadvise, madviseSlow);
     NODE_SET_VALUE(isolate, exports, "PROT_READ", Integer::New(isolate, (int32_t)PROT_READ));
   NODE_SET_VALUE(isolate, exports, "MAP_PRIVATE", Integer::New(isolate, (int32_t)MAP_PRIVATE));
   NODE_SET_VALUE(isolate, exports, "PROT_WRITE", Integer::New(isolate, (int32_t)PROT_WRITE));
@@ -612,6 +677,11 @@ NODE_SET_METHOD(exports, "unwrap_memory", unwrap_memorySlow);
   NODE_SET_VALUE(isolate, exports, "RTLD_LAZY", Integer::New(isolate, (int32_t)RTLD_LAZY));
   NODE_SET_VALUE(isolate, exports, "RTLD_LOCAL", Integer::New(isolate, (int32_t)RTLD_LOCAL));
   NODE_SET_VALUE(isolate, exports, "RTLD_NOLOAD", Integer::New(isolate, (int32_t)RTLD_NOLOAD));
+  NODE_SET_VALUE(isolate, exports, "RTLD_NOW", Integer::New(isolate, (int32_t)RTLD_NOW));
+  NODE_SET_VALUE(isolate, exports, "RTLD_GLOBAL", Integer::New(isolate, (int32_t)RTLD_GLOBAL));
+  NODE_SET_VALUE(isolate, exports, "RTLD_DEFAULT", BigInt::New(isolate, (uint64_t)RTLD_DEFAULT));
+  NODE_SET_VALUE(isolate, exports, "RTLD_NEXT", BigInt::New(isolate, (uint64_t)RTLD_NEXT));
+  NODE_SET_VALUE(isolate, exports, "MADV_HUGEPAGE", Integer::New(isolate, (int32_t)MADV_HUGEPAGE));
 
 }
 
