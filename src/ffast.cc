@@ -122,24 +122,27 @@ void lo_fastcall (struct fastcall* state) {
   ((lo_fast_call)state->fn)(&state->args);
 }
 
+/*
 void SlowCallback(const FunctionCallbackInfo<Value> &args) {
+  struct fastcall* state = (struct fastcall*)foo;
+  if (state->nparam == 0 & state->result == FastTypes::empty) {
+    ((lo_fast_call)state->fn)(&state->args);
+    return;
+  }
+}
+*/
+
+void SlowCallback(const FunctionCallbackInfo<Value> &args) {
+//  struct fastcall* state = (struct fastcall*)args.Data()->IntegerValue(isolate->GetCurrentContext()).ToChecked();
+//  struct fastcall* state = (struct fastcall*)args.Data()
+//    .As<Object>()->GetAlignedPointerFromInternalField(1);
+  struct fastcall* state = (struct fastcall*)Local<Integer>::Cast(args.Data())->Value();
+  if (state->nparam == 0 & state->result == FastTypes::empty) {
+    lo_fastcall(state);
+    return;
+  }
   Isolate* isolate = args.GetIsolate();
   HandleScope scope(isolate);
-  struct fastcall* state = (struct fastcall*)args.Data()
-    .As<Object>()->GetAlignedPointerFromInternalField(1);
-/*
-  int r = 1;
-  for (int i = 0; i < state->nparam; i++) {
-    if (state->param[i] == FastTypes::string) {
-      String::Utf8Value arg0(isolate, args[i]);
-      state->args[r++] = (uint64_t)*arg0;
-    } else if (state->param[i] == FastTypes::u32) {
-      state->args[r++] = (uint32_t)Local<Integer>::Cast(args[i])->Value();
-    } else if (state->param[i] == FastTypes::i32) {
-      state->args[r++] = (int32_t)Local<Integer>::Cast(args[i])->Value();
-    }
-  }
-*/
   int r = 1;
   for (int i = 0; i < state->nparam; i++) {
     switch (state->param[i]) {
@@ -287,10 +290,11 @@ void bind_fastcallSlow(const FunctionCallbackInfo<Value> &args) {
   // TODO - does integer work?
   struct fastcall* state = reinterpret_cast<struct fastcall*>(
     Local<Integer>::Cast(args[0])->Value());
-  Local<ObjectTemplate> tpl = ObjectTemplate::New(isolate);
-  tpl->SetInternalFieldCount(2);
-  Local<Object> data = tpl->NewInstance(context).ToLocalChecked();
-  data->SetAlignedPointerInInternalField(1, state);
+  //Local<ObjectTemplate> tpl = ObjectTemplate::New(isolate);
+  //tpl->SetInternalFieldCount(2);
+  //Local<Object> data = tpl->NewInstance(context).ToLocalChecked();
+  Local<Number> data = Number::New(isolate, (uint64_t)state);
+  //data->SetAlignedPointerInInternalField(1, state);
   uint8_t unwrap = needsunwrap((FastTypes)state->result);
   int fastlen = state->nparam + 1 + unwrap;
   CTypeInfo* cargs = (CTypeInfo*)calloc(fastlen, sizeof(CTypeInfo));
@@ -322,10 +326,11 @@ void bind_slowcallSlow(const FunctionCallbackInfo<Value> &args) {
   Local<Context> context = isolate->GetCurrentContext();
   struct fastcall* state = reinterpret_cast<struct fastcall*>(
     Local<Integer>::Cast(args[0])->Value());
-  Local<ObjectTemplate> tpl = ObjectTemplate::New(isolate);
-  tpl->SetInternalFieldCount(2);
-  Local<Object> data = tpl->NewInstance(context).ToLocalChecked();
-  data->SetAlignedPointerInInternalField(1, state);
+  //Local<ObjectTemplate> tpl = ObjectTemplate::New(isolate);
+  //tpl->SetInternalFieldCount(2);
+  Local<Number> data = Number::New(isolate, (uint64_t)state);
+  //Local<Object> data = tpl->NewInstance(context).ToLocalChecked();
+  //data->SetAlignedPointerInInternalField(1, state);
   Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate,
     SlowCallback, data, Local<Signature>(), 0, ConstructorBehavior::kThrow,
     SideEffectType::kHasNoSideEffect, 0
