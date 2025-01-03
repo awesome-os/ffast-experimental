@@ -1,6 +1,6 @@
 #include <node.h>
 #include "v8-fast-api-calls.h"
-
+/*
 struct FastApiTypedArray {
   uintptr_t length_;
   void* data;
@@ -15,7 +15,7 @@ struct FastApiArrayBuffer {
   void* data;
   size_t byte_length;
 };
-
+*/
 namespace ffast {
 
 using v8::Isolate;
@@ -39,6 +39,9 @@ using v8::ArrayBuffer;
 using v8::BackingStore;
 using v8::Number;
 using v8::NewStringType;
+using v8::FastApiArrayBufferView;
+using v8::FastApiArrayBuffer;
+using v8::FastOneByteString;
 
 void NODE_SET_VALUE(Isolate *isolate, Local<Object> 
   recv, const char *name, Local<Value> value) {

@@ -76,6 +76,11 @@ const api = {
     parameters: ['u32'],
     result: 'i32'
   },
+  utf8_length: {
+    result: 'i32',
+    parameters: ['string'],
+    declare_only: true,
+  },
 }
 
 const constants = {
@@ -352,8 +357,8 @@ void get_addressSlow(const FunctionCallbackInfo<Value> &args) {
   ((uint64_t*)args[1].As<Uint32Array>()->Buffer()->Data())[0] = (uint64_t)ptr;
 }
 
-void get_addressFast(void* p, struct FastApiTypedArray* const p_buf, 
-  struct FastApiTypedArray* const p_ret) {
+void get_addressFast(void* p, struct FastApiArrayBufferView* const p_buf, 
+  struct FastApiArrayBufferView* const p_ret) {
   ((uint64_t*)p_ret->data)[0] = (uint64_t)p_buf->data;
 }
 
@@ -442,6 +447,15 @@ void wrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
 void unwrap_memorySlow(const FunctionCallbackInfo<Value> &args) {
   Local<ArrayBuffer> ab = args[0].As<ArrayBuffer>();
   ab->Detach();
+}
+
+void utf8_lengthSlow(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  args.GetReturnValue().Set(args[0].As<String>()->Utf8Length(isolate));
+}
+
+int32_t utf8_lengthFast (void* p, struct FastOneByteString* const p_str) {
+  return p_str->length;
 }
 
 void register_callbackSlow(const FunctionCallbackInfo<Value>& args) {

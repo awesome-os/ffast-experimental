@@ -3,6 +3,30 @@
 
 namespace ffast {
 
+uint32_t memcount_sseFast(void* p, void* p0, int32_t p1, uint32_t p2);
+v8::CTypeInfo cargsmemcount_sse[4] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+};
+v8::CTypeInfo rcmemcount_sse = v8::CTypeInfo(v8::CTypeInfo::Type::kUint32);
+v8::CFunctionInfo infomemcount_sse = v8::CFunctionInfo(rcmemcount_sse, 4, cargsmemcount_sse);
+v8::CFunction pFmemcount_sse = v8::CFunction((const void*)&memcount_sseFast, &infomemcount_sse);
+
+
+uint32_t memcount_avx2Fast(void* p, void* p0, int32_t p1, uint32_t p2);
+v8::CTypeInfo cargsmemcount_avx2[4] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+};
+v8::CTypeInfo rcmemcount_avx2 = v8::CTypeInfo(v8::CTypeInfo::Type::kUint32);
+v8::CFunctionInfo infomemcount_avx2 = v8::CFunctionInfo(rcmemcount_avx2, 4, cargsmemcount_avx2);
+v8::CFunction pFmemcount_avx2 = v8::CFunction((const void*)&memcount_avx2Fast, &infomemcount_avx2);
+
+
 #include <immintrin.h>
 
 size_t memcount_sse(const void *s, int c, size_t n) {    
@@ -52,18 +76,6 @@ size_t memcount_avx2(const void *s, int c, size_t n) {
 
 
 
-uint32_t memcount_sseFast(void* p, void* p0, int32_t p1, uint32_t p2);
-v8::CTypeInfo cargsmemcount_sse[4] = {
-v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
-  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
-  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
-  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
-};
-v8::CTypeInfo rcmemcount_sse = v8::CTypeInfo(v8::CTypeInfo::Type::kUint32);
-v8::CFunctionInfo infomemcount_sse = v8::CFunctionInfo(rcmemcount_sse, 4, cargsmemcount_sse);
-v8::CFunction pFmemcount_sse = v8::CFunction((const void*)&memcount_sseFast, &infomemcount_sse);
-
-
 void memcount_sseSlow(const FunctionCallbackInfo<Value> &args) {
   void* v0 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[0])->Value());
   int32_t v1 = Local<Integer>::Cast(args[1])->Value();
@@ -78,18 +90,6 @@ uint32_t memcount_sseFast(void* p, void* p0, int32_t p1, uint32_t p2) {
   uint32_t v2 = p2;
   return memcount_sse(v0, v1, v2);
 }
-
-uint32_t memcount_avx2Fast(void* p, void* p0, int32_t p1, uint32_t p2);
-v8::CTypeInfo cargsmemcount_avx2[4] = {
-v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
-  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
-  v8::CTypeInfo(v8::CTypeInfo::Type::kInt32),
-  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
-};
-v8::CTypeInfo rcmemcount_avx2 = v8::CTypeInfo(v8::CTypeInfo::Type::kUint32);
-v8::CFunctionInfo infomemcount_avx2 = v8::CFunctionInfo(rcmemcount_avx2, 4, cargsmemcount_avx2);
-v8::CFunction pFmemcount_avx2 = v8::CFunction((const void*)&memcount_avx2Fast, &infomemcount_avx2);
-
 
 void memcount_avx2Slow(const FunctionCallbackInfo<Value> &args) {
   void* v0 = reinterpret_cast<void*>((uint64_t)Local<Integer>::Cast(args[0])->Value());

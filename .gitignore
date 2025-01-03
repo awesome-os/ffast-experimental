@@ -6,3 +6,4 @@ demo
 micro-c
 .vscode
 *.so
+*.pem

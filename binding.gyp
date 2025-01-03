@@ -71,6 +71,17 @@
         "-march=native",
         "-mtune=native"
       ]
+    },
+    {
+      "target_name": "libssl",
+      "sources": [
+        "src/libssl.cc"
+      ],
+      "cflags_cc": [
+        "-O3",
+        "-march=native",
+        "-mtune=native"
+      ]
     }
   ]
 }

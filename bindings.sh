@@ -10,4 +10,5 @@ node gen.js count
 node gen.js ffast
 node gen.js tcc
 node gen.js noop
-node-gyp rebuild
+node gen.js libssl
+node-gyp --verbose rebuild

@@ -2,10 +2,6 @@
 #include "ffast.h"
 
 namespace ffast {
-extern "C" {
-void noop () {
-}
-}
 
 void noop_fastFast(void* p);
 v8::CTypeInfo cargsnoop_fast[1] = {
@@ -17,6 +13,11 @@ v8::CFunctionInfo infonoop_fast = v8::CFunctionInfo(rcnoop_fast, 1, cargsnoop_fa
 v8::CFunction pFnoop_fast = v8::CFunction((const void*)&noop_fastFast, &infonoop_fast);
 
 
+extern "C" {
+void noop () {
+}
+}
+
 void noop_fastSlow(const FunctionCallbackInfo<Value> &args) {
 
   noop();
@@ -26,7 +27,6 @@ void noop_fastFast(void* p) {
 
   noop();
 }
-
 
 void noop_slowSlow(const FunctionCallbackInfo<Value> &args) {
 

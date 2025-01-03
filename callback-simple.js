@@ -8,7 +8,7 @@ const handle = assert(dlopen('./callback.so', RTLD_LOCAL | RTLD_NOW))
 
 const register = bind(assert(dlsym(handle, 'register_callback')), 'void', 
   ['pointer'])
-const once = bind(assert(dlsym(handle, 'callback_once')), 'void', [])
+const once = bind(assert(dlsym(handle, 'callback_once')), 'void', [], true)
 const callback_address = assert(wrap(create_handle(), get_callback_address, 0)())
 
 const nArgs = 2
@@ -20,11 +20,11 @@ register_callback(ctx.ptr, () => {
   const arg2 = addr(u32.subarray(8, 12))
   assert(arg2 === callback_ptr)
   const ret = u32[4] = u32[6] + 1
-  if ((ret % 1e8) === 0) {
     console.log(`arg 0    (u32)     : ${arg1}`)
     console.log(`arg 1    (pointer) : ${arg2}`)
     console.log(`returns  (u32)     : ${ret}`)
-  }
+  usleep(1)
+  process.nextTick(once)
 })
 
 const { rax, rdi, rsi, r15 } = Registers
@@ -41,6 +41,4 @@ const callback_ptr = compiler.compile(asm.bytes())
 
 register(callback_ptr)
 
-while (1) {
   once()
-}
