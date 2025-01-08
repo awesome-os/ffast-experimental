@@ -1,6 +1,6 @@
 import { 
   assert, ptr, dlopen, dlsym, RTLD_LAZY, RTLD_LOCAL, RTLD_DEFAULT, compiler, asm, Registers,
-  bind, bind_custom, RTLD_NOLOAD, RTLD_GLOBAL
+  bind, bind_custom, RTLD_NOLOAD, RTLD_GLOBAL, RTLD_NOW
 } from './lib/ffast.js'
 import { Bench } from './lib/bench.js'
 
@@ -8,6 +8,7 @@ const LAZY_LOCAL = RTLD_LAZY | RTLD_LOCAL
 
 const handle = assert(dlopen('../lo/lib/boringssl/deps/boringssl/build/libcrypto.so', LAZY_LOCAL))
 //const handle = assert(dlopen('libcrypto.so', RTLD_LAZY | RTLD_GLOBAL))
+//const handle = assert(dlopen('libcrypto.so', RTLD_NOW | RTLD_LOCAL))
 //const handle = 0
 /*
 boringssl = 156 ns
@@ -55,7 +56,7 @@ asm.push(rsi)
 asm.push(rdx)
 asm.movabs(hash_context, rdi)
 asm.movabs(hash_type, rsi)
-asm.zero(rdx)
+asm.movabs(0, rdx)
 asm.push(rdi)
 asm.call(EVP_DigestInit_ex_sym)
 asm.pop(rdi)
@@ -67,13 +68,16 @@ asm.pop(rdi)
 asm.movabs(digest_ptr, rsi)
 asm.movabs(hsize_ptr, rdx)
 asm.jmp(EVP_DigestFinal_ex_sym)
+
 const fast_addr = compiler.compile(asm.bytes())
+
 asm.reset()
 asm.push(rbx)
 asm.movreg(rdi, rbx)
 asm.movabs(hash_context, rdi)
 asm.movabs(hash_type, rsi)
-asm.zero(rdx)
+//asm.zero(rdx)
+asm.movabs(0, rdx)
 asm.push(rdi)
 asm.call(EVP_DigestInit_ex_sym)
 asm.pop(rdi)
@@ -88,8 +92,9 @@ asm.call(EVP_DigestFinal_ex_sym)
 asm.movdest(rax, rbx, 0)
 asm.pop(rbx)
 asm.ret()
+
 const slow_addr = compiler.compile(asm.bytes())
-const hash_fast = bind_custom('i32', ['pointer', 'u32'], false, fast_addr, slow_addr)
+const hash_fast = bind_custom('i32', ['pointer', 'u32'], slow_addr, fast_addr)
 
 function hash (src, src_len) {
   assert(hash_fast(src, src_len) === 1)
@@ -115,24 +120,26 @@ const expected = [
 
 hash_normal(u8_ptr, u8_length, digest_ptr, hsize_ptr)
 hash_digest.forEach((v, i) => assert(v === expected[i]))
-//hash(u8_ptr, u8_length)
+
+hash(u8_ptr, u8_length)
 //hash_digest.forEach((v, i) => assert(v === expected[i]))
 
-while (1) {
-/*
+console.log('foo')
+{
+
   for (let i = 0; i < iter; i++) {
     bench.start('md5-fast')
     for (let j = 0; j < runs; j++) {
       hash(u8_ptr, u8_length)
     }
-    bench.end(runs, 5)
+    bench.end(runs, u8_length)
   }
-*/
+
   for (let i = 0; i < iter; i++) {
     bench.start('md5-full')
     for (let j = 0; j < runs; j++) {
       hash_normal(u8_ptr, u8_length, digest_ptr, hsize_ptr)
     }
-    bench.end(runs, 5)
+    bench.end(runs, u8_length)
   }
 }

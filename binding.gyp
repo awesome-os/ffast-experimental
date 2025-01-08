@@ -1,14 +1,20 @@
 {
   "targets": [
     {
-      "target_name": "linecount",
+      "target_name": "sqlite",
       "sources": [
-        "src/linecount.cc"
+        "src/sqlite.cc"
       ],
       "cflags_cc": [
         "-O3",
         "-march=native",
         "-mtune=native"
+      ],
+      "include_dirs": [
+        "../lo/lib/sqlite/deps/sqlite"
+      ],
+      "libraries": [
+        "/media/andrew/OCZ/source2023/just-js/lo/lib/sqlite/deps/sqlite/.libs/libsqlite3.a"
       ]
     },
     {
@@ -81,7 +87,26 @@
         "-O3",
         "-march=native",
         "-mtune=native"
-      ]
+      ],
+      "link_settings": {
+        "libraries": []
+      }
+    },
+    {
+      "target_name": "seccomp",
+      "sources": [
+        "src/seccomp.cc"
+      ],
+      "cflags_cc": [
+        "-O3",
+        "-march=native",
+        "-mtune=native"
+      ],
+      "link_settings": {
+        "libraries": [
+          "-lseccomp"
+        ]
+      }
     }
   ]
 }

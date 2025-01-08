@@ -2,8 +2,9 @@ import { Bench } from './lib/bench.js'
 
 const encoder = new TextEncoder()
 const hello = encoder.encode('hello')
+const len = hello.length
 
-const iter = parseInt(args[0] || '10', 10)
+const iter = parseInt(args[0] || '5', 10)
 const runs = parseInt(args[1] || '3000000', 10)
 const bench = new Bench()
 
@@ -19,9 +20,9 @@ Bun.MD5.hash('hello').forEach((v, i) => assert(v === expected[i]))
   for (let i = 0; i < iter; i++) {
     bench.start('md5-string')
     for (let j = 0; j < runs; j++) {
-      hash('hello')
+      assert(hash('hello').length === 16)
     }
-    bench.end(runs)
+    bench.end(runs, len)
   }
 }
 
@@ -31,9 +32,9 @@ Bun.MD5.hash('hello').forEach((v, i) => assert(v === expected[i]))
   for (let i = 0; i < iter; i++) {
     bench.start('md5-buffer')
     for (let j = 0; j < runs; j++) {
-      hash(hello)
+      assert(hash(hello).length === 16)
     }
-    bench.end(runs)
+    bench.end(runs, len)
   }
 }
 

@@ -11,4 +11,6 @@ node gen.js ffast
 node gen.js tcc
 node gen.js noop
 node gen.js libssl
+node gen.js seccomp
+node gen.js sqlite
 node-gyp --verbose rebuild

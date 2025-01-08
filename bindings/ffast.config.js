@@ -81,6 +81,26 @@ const api = {
     parameters: ['string'],
     declare_only: true,
   },
+  utf8_decode: {
+    parameters: ['pointer', 'i32'],
+    declare_only: true,
+    nofast: true
+  },
+  latin1_decode: {
+    parameters: ['pointer', 'i32'],
+    declare_only: true,
+    nofast: true
+  },
+  strnlen: {
+    parameters: ['pointer', 'u32'],
+    pointers: ['const char*'],
+    result: 'u32'
+  },
+  read_memory: {
+    result: 'void',
+    parameters: ['buffer', 'pointer', 'u32'],
+    declare_only: true,
+  },
 }
 
 const constants = {
@@ -173,6 +193,7 @@ void FreeMemory(void* buf, size_t length, void* data) {
   free(buf);
 }
 
+// make this a static table we can look up
 CTypeInfo* CTypeFromV8 (uint8_t v8Type) {
   if (v8Type == FastTypes::boolean)
     return new CTypeInfo(CTypeInfo::Type::kBool);
@@ -468,6 +489,44 @@ void register_callbackSlow(const FunctionCallbackInfo<Value>& args) {
   info->nargs = nargs;
   info->js_fn.Reset(isolate, Global<Function>(isolate, fn));
 }
+
+void utf8_decodeSlow(const FunctionCallbackInfo<Value> &args) {
+  int size = -1;
+  if (args.Length() > 1) {
+    size = Local<Integer>::Cast(args[1])->Value();
+  }
+  char* str = reinterpret_cast<char*>(
+    (uint64_t)Local<Integer>::Cast(args[0])->Value());
+  args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), 
+    str, NewStringType::kNormal, size).ToLocalChecked());
+}
+
+void latin1_decodeSlow(const FunctionCallbackInfo<Value> &args) {
+  int size = -1;
+  if (args.Length() > 1) {
+    size = Local<Integer>::Cast(args[1])->Value();
+  }
+  uint8_t* str = reinterpret_cast<uint8_t*>(
+    (uint64_t)Local<Integer>::Cast(args[0])->Value());
+  args.GetReturnValue().Set(String::NewFromOneByte(args.GetIsolate(), 
+    str, NewStringType::kNormal, size).ToLocalChecked());
+}
+
+void read_memorySlow(const FunctionCallbackInfo<Value> &args) {
+  Local<Uint8Array> u8 = args[0].As<Uint8Array>();
+  uint8_t* dest = (uint8_t*)u8->Buffer()->Data() + u8->ByteOffset();
+  void* start = reinterpret_cast<void*>(
+    (uint64_t)Local<Integer>::Cast(args[1])->Value());
+  uint32_t size = Local<Integer>::Cast(args[2])->Value();
+  memcpy(dest, start, size);
+}
+
+void read_memoryFast(void* p, struct FastApiArrayBufferView* const p_buf, 
+  void* start, uint32_t size) {
+  memcpy(p_buf->data, start, size);
+}
+
+
 
 `
 

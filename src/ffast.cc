@@ -163,6 +163,31 @@ v8::CFunctionInfo infoutf8_length = v8::CFunctionInfo(rcutf8_length, 2, cargsutf
 v8::CFunction pFutf8_length = v8::CFunction((const void*)&utf8_lengthFast, &infoutf8_length);
 
 
+
+
+uint32_t strnlenFast(void* p, void* p0, uint32_t p1);
+v8::CTypeInfo cargsstrnlen[3] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+};
+v8::CTypeInfo rcstrnlen = v8::CTypeInfo(v8::CTypeInfo::Type::kUint32);
+v8::CFunctionInfo infostrnlen = v8::CFunctionInfo(rcstrnlen, 3, cargsstrnlen);
+v8::CFunction pFstrnlen = v8::CFunction((const void*)&strnlenFast, &infostrnlen);
+
+
+void read_memoryFast(void* p, struct FastApiArrayBufferView* const p0, void* p1, uint32_t p2);
+v8::CTypeInfo cargsread_memory[4] = {
+v8::CTypeInfo(v8::CTypeInfo::Type::kV8Value),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint8, CTypeInfo::SequenceType::kIsTypedArray, CTypeInfo::Flags::kNone),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint64),
+  v8::CTypeInfo(v8::CTypeInfo::Type::kUint32),
+};
+v8::CTypeInfo rcread_memory = v8::CTypeInfo(v8::CTypeInfo::Type::kVoid);
+v8::CFunctionInfo inforead_memory = v8::CFunctionInfo(rcread_memory, 4, cargsread_memory);
+v8::CFunction pFread_memory = v8::CFunction((const void*)&read_memoryFast, &inforead_memory);
+
+
 using v8::HandleScope;
 using v8::Uint8Array;
 using v8::Uint32Array;
@@ -232,6 +257,7 @@ void FreeMemory(void* buf, size_t length, void* data) {
   free(buf);
 }
 
+// make this a static table we can look up
 CTypeInfo* CTypeFromV8 (uint8_t v8Type) {
   if (v8Type == FastTypes::boolean)
     return new CTypeInfo(CTypeInfo::Type::kBool);
@@ -528,6 +554,44 @@ void register_callbackSlow(const FunctionCallbackInfo<Value>& args) {
   info->js_fn.Reset(isolate, Global<Function>(isolate, fn));
 }
 
+void utf8_decodeSlow(const FunctionCallbackInfo<Value> &args) {
+  int size = -1;
+  if (args.Length() > 1) {
+    size = Local<Integer>::Cast(args[1])->Value();
+  }
+  char* str = reinterpret_cast<char*>(
+    (uint64_t)Local<Integer>::Cast(args[0])->Value());
+  args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), 
+    str, NewStringType::kNormal, size).ToLocalChecked());
+}
+
+void latin1_decodeSlow(const FunctionCallbackInfo<Value> &args) {
+  int size = -1;
+  if (args.Length() > 1) {
+    size = Local<Integer>::Cast(args[1])->Value();
+  }
+  uint8_t* str = reinterpret_cast<uint8_t*>(
+    (uint64_t)Local<Integer>::Cast(args[0])->Value());
+  args.GetReturnValue().Set(String::NewFromOneByte(args.GetIsolate(), 
+    str, NewStringType::kNormal, size).ToLocalChecked());
+}
+
+void read_memorySlow(const FunctionCallbackInfo<Value> &args) {
+  Local<Uint8Array> u8 = args[0].As<Uint8Array>();
+  uint8_t* dest = (uint8_t*)u8->Buffer()->Data() + u8->ByteOffset();
+  void* start = reinterpret_cast<void*>(
+    (uint64_t)Local<Integer>::Cast(args[1])->Value());
+  uint32_t size = Local<Integer>::Cast(args[2])->Value();
+  memcpy(dest, start, size);
+}
+
+void read_memoryFast(void* p, struct FastApiArrayBufferView* const p_buf, 
+  void* start, uint32_t size) {
+  memcpy(p_buf->data, start, size);
+}
+
+
+
 
 
 void dlopenSlow(const FunctionCallbackInfo<Value> &args) {
@@ -708,6 +772,22 @@ int32_t usleepFast(void* p, uint32_t p0) {
 }
 
 
+
+
+void strnlenSlow(const FunctionCallbackInfo<Value> &args) {
+  const char* v0 = reinterpret_cast<const char*>((uint64_t)Local<Integer>::Cast(args[0])->Value());
+  uint32_t v1 = Local<Integer>::Cast(args[1])->Value();
+  uint32_t rc = strnlen(v0, v1);
+  args.GetReturnValue().Set(rc);
+}
+
+uint32_t strnlenFast(void* p, void* p0, uint32_t p1) {
+  const char* v0 = reinterpret_cast<const char*>(p0);
+  uint32_t v1 = p1;
+  return strnlen(v0, v1);
+}
+
+
 void Initialize(Local<Object> exports) {
   Isolate* isolate = Isolate::GetCurrent();
   NODE_SET_FAST_METHOD(isolate, exports, "dlopen", &pFdlopen, dlopenSlow);
@@ -729,6 +809,10 @@ NODE_SET_FAST_METHOD(isolate, exports, "madvise", &pFmadvise, madviseSlow);
 NODE_SET_FAST_METHOD(isolate, exports, "sleep", &pFsleep, sleepSlow);
 NODE_SET_FAST_METHOD(isolate, exports, "usleep", &pFusleep, usleepSlow);
 NODE_SET_FAST_METHOD(isolate, exports, "utf8_length", &pFutf8_length, utf8_lengthSlow);
+NODE_SET_METHOD(exports, "utf8_decode", utf8_decodeSlow);
+NODE_SET_METHOD(exports, "latin1_decode", latin1_decodeSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "strnlen", &pFstrnlen, strnlenSlow);
+NODE_SET_FAST_METHOD(isolate, exports, "read_memory", &pFread_memory, read_memorySlow);
     NODE_SET_VALUE(isolate, exports, "PROT_READ", Integer::New(isolate, (int32_t)PROT_READ));
   NODE_SET_VALUE(isolate, exports, "MAP_PRIVATE", Integer::New(isolate, (int32_t)MAP_PRIVATE));
   NODE_SET_VALUE(isolate, exports, "PROT_WRITE", Integer::New(isolate, (int32_t)PROT_WRITE));
