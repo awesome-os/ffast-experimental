@@ -220,7 +220,6 @@ struct fastcall {
 };
 
 int struct_fastcall_size = sizeof(struct fastcall);
-
 typedef void (*lo_fast_call)(void*);
 
 struct exec_info {
@@ -234,6 +233,13 @@ void lo_callback (exec_info* info) {
   Isolate* isolate = info->isolate;
   HandleScope scope(isolate);
   info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
+    v8::Null(isolate), 0, 0).ToLocalChecked();
+}
+/*
+void lo_callback (exec_info* info) {
+  Isolate* isolate = info->isolate;
+  HandleScope scope(isolate);
+  info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
     v8::Null(isolate), 0, 0);
 //  TryCatch try_catch(isolate);
 //  MaybeLocal<Value> result = info->js_fn.Get(isolate)->Call(isolate->GetCurrentContext(), 
@@ -243,6 +249,7 @@ void lo_callback (exec_info* info) {
 //  }
 //  TODO: this needs to return a value
 }
+*/
 
 inline uint8_t needsunwrap (FastTypes t) {
   if (t == FastTypes::buffer) return 1;

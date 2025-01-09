@@ -21,10 +21,6 @@ function real_callback (counter) {
   return counter
 }
 
-function trampoline () {
-  u32[4] = real_callback(u32[6])
-}
-
 const AD = '\u001b[0m'  // ANSI Default
 const AG = '\u001b[32m' // ANSI Green
 const AY = '\u001b[33m' // ANSI Yellow
@@ -44,7 +40,7 @@ const nArgs = 1
 const ctx = ptr(new Uint8Array(((nArgs + 3) * 8)))
 const u32 = new Uint32Array(ctx.buffer)
 const callback_address = assert(get_callback_address())
-register_callback(ctx.ptr, trampoline)
+register_callback(ctx.ptr, () => u32[4] = real_callback(u32[6]))
 const runs = 30000000
 let total = 20
 
@@ -52,9 +48,11 @@ asm.reset()
 asm.movabs(ctx.ptr, rax)
 asm.movdest(rdi, rax, 24)
 asm.movreg(rax, rdi)
+asm.push(r15)
 asm.movreg(rax, r15)
 asm.call(callback_address)
 asm.movsrc(r15, rax, 16)
+asm.pop(r15)
 asm.ret()
 
 const wrapper = compiler.compile(asm.bytes())

@@ -5,7 +5,7 @@ import {
 
 function measure (runs) {
   const now = Date.now()
-  console.log(Math.floor(((now - then) * 1000000) / runs))
+  console.log(`${Math.floor(((now - then) * 1000000) / runs)} ns/op ${process.memoryUsage().rss} rss`)
   then = now
 }
 
@@ -46,9 +46,11 @@ asm.reset()
 asm.movabs(ctx.ptr, rax)
 asm.movdest(rdi, rax, 24)
 asm.movreg(rax, rdi)
+asm.push(r15)
 asm.movreg(rax, r15)
 asm.call(callback_address)
 asm.movsrc(r15, rax, 16)
+asm.pop(r15)
 asm.ret()
 const callback_ptr = compiler.compile(asm.bytes())
 
