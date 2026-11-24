@@ -193,3 +193,13 @@ In file included from ../src/ffast.h:1,
 make: Leaving directory '/media/andrew/OCZ/source2023/just-js/node-lo/build'
 gyp info ok 
 ```
+
+## Quick Install & Run (Windows / Linux / macOS)
+
+```sh
+# Install globally via awesome-os/pnpm (all platforms)
+pnpm add -g github:awesome-os/ffast-experimental
+
+# Run directly (all platforms)
+ffast-experimental --help
+```
