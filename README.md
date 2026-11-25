@@ -197,9 +197,9 @@ gyp info ok
 ## Quick Install & Run (Windows / Linux / macOS)
 
 ```sh
-# Install globally via awesome-os/pnpm (all platforms)
-pnpm add -g github:awesome-os/ffast-experimental
+# Install / hydrate from v11 CAS via holo-pm
+holo-pm install repository://github.com/awesome-os/ffast-experimental@main
 
-# Run directly (all platforms)
-ffast-experimental --help
+# Or project & run directly via holo-project (0-byte hardlink)
+holo-project "project://node/ffast-experimental?from=repository://github.com/awesome-os/ffast-experimental@main"
 ```
